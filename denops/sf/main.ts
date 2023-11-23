@@ -1,7 +1,5 @@
-import {
-  Denops,
-  ensureString,
-} from './deps.ts';
+import { Denops, ensureString, vars } from "./deps.ts";
+import { SfClient } from "./sf_client.ts";
 
 export async function main(denops: Denops): Promise<void> {
   denops.dispatcher = {
@@ -14,5 +12,4 @@ export async function main(denops: Denops): Promise<void> {
   await denops.cmd(
     `command! -nargs=1 HelloWorldEcho echomsg denops#request('${denops.name}', 'echo', [<q-args>])`,
   );
-};
-
+}

@@ -6,9 +6,14 @@ Deno.test("init should load config file", async () => {
       '{"orgs": [ {"user_name": "prod@example.com", "isSandbox": false, "instanceUrl": "https://hoge.my.salesforce.com", "alias": "prod"}, {"user_name": "prod@example.com.sandbox", "isSandbox": true, "instanceUrl": "https://hoge--sandbox.sandbox.mysalesforce.com", "alias": "sandbox"}]}'
     )
   );
+  const sfClient = new SfClient();
+  const checkSfAvailableStub = stub(
+    sfClient,
+    "checkSfAvailable",
+    async () => {}
+  );
 
   try {
-    const sfClient = new SfClient();
     await sfClient.init();
 
     const orgs = sfClient.orgs;
@@ -25,5 +30,23 @@ Deno.test("init should load config file", async () => {
     assertEquals(orgs[1].alias, "sandbox");
   } finally {
     readTextFileStub.restore();
+    checkSfAvailableStub.restore();
+  }
+});
+
+Deno.test("init fail when sf command is not available", async () => {
+  const errorMessage =
+    "sf command is not avalable. please install before use this plugin";
+  const sfClient = new SfClient();
+  const checkSfAvailableStub = stub(sfClient, "checkSfAvailable", async () => {
+    throw new Error(errorMessage);
+  });
+
+  try {
+    await sfClient.init();
+  } catch (error) {
+    assertEquals(error.message, errorMessage);
+  } finally {
+    checkSfAvailableStub.restore();
   }
 });

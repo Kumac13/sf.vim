@@ -7,6 +7,21 @@ interface Org {
   alias: string;
 }
 
+type SfCommandResultData = object | object[] | string;
+interface SfCommandSuccess {
+  status: number;
+  result: SfCommandResultData;
+  warning?: string;
+}
+
+interface SfCommandError {
+  status: number;
+  context: string;
+  message: string;
+}
+
+type SfCommandResult = SfCommandSuccess | SfCommandError;
+
 class SfClient {
   #orgs: Org[] = [];
 
@@ -15,27 +30,19 @@ class SfClient {
   }
 
   async init(): Promise<void> {
+    await this.checkSfAvailable();
     const config = await loadConfig();
     this.#orgs = config.orgs.map((org: Org) => ({
       user_name: org.user_name,
       isSandbox: org.isSandbox,
       instanceUrl: org.instanceUrl,
-      alias: org.alias
+      alias: org.alias,
     }));
   }
 
-  async setOrgs(): Promise<void> {
-    if (await !this.isSfAvailable()) {
-      return;
-    }
-
-    const result = await this.getOrgList();
-    console.log(result.result);
-  }
-
-  async getOrgList(): Promise<any> {
+  async runSfCommand(commands: string[]): Promise<SfCommandResult> {
     const process = Deno.run({
-      cmd: ["sf", "auth", "list", "--json"],
+      cmd: commands,
       stdout: "piped",
       stderr: "piped",
     });
@@ -45,10 +52,20 @@ class SfClient {
 
     const text = new TextDecoder().decode(output);
     try {
-      return JSON.parse(text);
+      const json: SfCommandResult = JSON.parse(text);
+      if (json.status !== 0) {
+        if ("context" in json && "message" in json) {
+          throw new Error(
+            `Failed to execute sf command on ${json.context}: ${json.message}`
+          );
+        } else {
+          throw new Error("Unknown error occurred");
+        }
+      }
+      return json;
     } catch (error) {
-      console.error("Failed to parse JSON: ", error);
-      return null;
+      console.error("Failed to run command: ", error);
+      throw error;
     }
   }
 
@@ -60,7 +77,7 @@ class SfClient {
     this.#orgs = [];
   }
 
-  private async isSfAvailable(): Promise<boolean> {
+  async checkSfAvailable(): Promise<void> {
     const process = Deno.run({
       cmd: ["sf", "--version"],
       stdout: "null",
@@ -69,7 +86,12 @@ class SfClient {
 
     const status = await process.status();
     process.close();
-    return status.code === 0;
+    if (status.code !== 0) {
+      throw new Error(
+        "sf command is not avalable. please install before use this plugin"
+      );
+    }
+    return;
   }
 }
 
